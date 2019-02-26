@@ -1,7 +1,10 @@
 分享会准备材料：
 Promise 对象：
+---------------------------promise概述-----------------------
 Promise 是异步编程的一种解决方案，所谓Promise，简单说就是一个容器，里面保存着某个未来才会结束的事件（通常是一个异步操作）的结果。从语法上说，Promise 是一个对象，从它可以获取异步操作的消息。Promise 提供统一的 API，各种异步操作都可以用同样的方法进行处理。
+---------------------------promise概述-----------------------
 
+---------------------------promise特点-----------------------
 Promise对象有以下两个特点。
 （1）对象的状态不受外界影响。Promise对象代表一个异步操作，有三种状态：pending（进行中）、resolved（已成功）和rejected（已失败）。
 （2）只有异步操作的结果，可以决定当前是哪一种状态，任何其他操作都无法改变这个状态。一旦状态改变，就不会再变，任何时候都可以得到这个结果。Promise对象的状态改变，只有两种可能：从pending变为resolved和从pending变为rejected。只要这两种情况发生，状态就凝固了，不会再变了，会一直保持这个结果，这时就称为已定型。如果改变已经发生了，你再对Promise对象添加回调函数，也会立即得到这个结果。这与事件（Event）完全不同，事件的特点是，如果你错过了它，再去监听，是得不到结果的。
@@ -32,8 +35,6 @@ promise.then(function(value) {
 promise.catch 用于处理之前没有被处理的 rejected promise,相当于promise.then(null, errCb)
 promise.finally 将最后被调用, 一般用于资源释放的清理操作
 
-
-
 关于执行顺序，如：
 let promise = new Promise(function(resolve, reject) {
   console.log('1');
@@ -46,9 +47,6 @@ console.log('3');
 输出顺序为：
 // 1、 3、 2
 上面代码中，Promise 新建后立即执行，所以首先输出的是1。然后，then方法指定的回调函数，将在当前脚本所有同步任务执行完才会执行，所以2最后输出。
-
-
-
 
 
 某些特殊情况：
@@ -71,9 +69,68 @@ p2
 上面代码中，p1这个promise实例在3 秒之后变为rejected状态。由于p2的resolve依赖p1，导致p2自己的状态无效了，由p1的状态决定p2的状态。
 
 
+promise chains 的链式调用
+任何在 successCb, errCb 中返回的非 $q.reject()对象, 都将成为一个 resolve 的 promise. 
+所以可以出现如下语法 promise.then().then().then()
+
+$q.when("1")
+    .then(function (data) {
+        console.log(data);
+        return $q.reject(2);
+    })
+    .catch(function (err) {
+        console.log(err);
+        return 3;
+    })
+    .then(function (data) {
+        console.log(data);
+    })
+    
+// output: 1 2 3
+
+
+var promise = new Promise(function(resolve){
+		    resolve('1');
+		});
+		promise.then(function(value1){
+		    console.log(value1);
+		    return '2';
+		})
+		.then(function(value2){
+		    console.log(value2);
+		});
+以上依次输出1、2。说明了两个问题：
+尽管第一个then只是return一个’2’，但这个then仍然返回的是一个promise对象，否则其后怎么可以又接一个then？
+第一个then里的resolved函数里return的值，会作为参数传入到其后的then里的resolved函数里。
+以下代码得到的结果跟上面的代码效果一样：
+var promise = new Promise(function(resolve,reject){
+		    resolve('1');
+		});
+		promise.then(function(value1){
+		    console.log(value1);
+		    return new Promise(function(resolve,reject){
+			    resolve('2');
+			});
+		})
+		.then(function(value2){
+		    console.log(value2);
+		});
+
+
+采用链式的then，可以指定一组按照次序调用的回调函数。这时，前一个回调函数，有可能返回的还是一个Promise对象（即有异步操作），这时后一个回调函数，就会等待该Promise对象的状态发生变化，才会被调用。
+getJSON("/post/1.json").then(function(post) {
+  return getJSON(post.commentURL);
+}).then(function funcA(comments) {
+  console.log("resolved: ", comments);
+}, function funcB(err){
+  console.log("rejected: ", err);
+});
+上面代码中，第一个then方法指定的回调函数，返回的是另一个Promise对象。这时，第二个then方法指定的回调函数，就会等待这个新的Promise对象状态发生变化。如果变为resolved，就调用funcA，如果状态变为rejected，就调用funcB。
+---------------------------promise特点-----------------------
 
 
 
+---------------------------$q、$when-----------------------
 $q创建 promise
 $q 支持两种写法,第一种是ES6标准构造函数写法：
 var iWantResolve = true;
@@ -160,67 +217,9 @@ $q.when("some value", function (data){
 // output: some value
 
 $q.resolve 相当于 $q.when(value, successCb, errorCb, progressCb)
+---------------------------$q、$when-----------------------
 
 
-
-promise chains 的链式调用
-任何在 successCb, errCb 中返回的非 $q.reject()对象, 都将成为一个 resolve 的 promise. 
-所以可以出现如下语法 promise.then().then().then()
-
-$q.when("1")
-    .then(function (data) {
-        console.log(data);
-        return $q.reject(2);
-    })
-    .catch(function (err) {
-        console.log(err);
-        return 3;
-    })
-    .then(function (data) {
-        console.log(data);
-    })
-    
-// output: 1 2 3
-
-
-var promise = new Promise(function(resolve){
-		    resolve('1');
-		});
-		promise.then(function(value1){
-		    console.log(value1);
-		    return '2';
-		})
-		.then(function(value2){
-		    console.log(value2);
-		});
-以上依次输出1、2。说明了两个问题：
-尽管第一个then只是return一个’2’，但这个then仍然返回的是一个promise对象，否则其后怎么可以又接一个then？
-第一个then里的resolved函数里return的值，会作为参数传入到其后的then里的resolved函数里。
-以下代码得到的结果跟上面的代码效果一样：
-var promise = new Promise(function(resolve,reject){
-		    resolve('1');
-		});
-		promise.then(function(value1){
-		    console.log(value1);
-		    return new Promise(function(resolve,reject){
-			    resolve('2');
-			});
-		})
-		.then(function(value2){
-		    console.log(value2);
-		});
-
-
-采用链式的then，可以指定一组按照次序调用的回调函数。这时，前一个回调函数，有可能返回的还是一个Promise对象（即有异步操作），这时后一个回调函数，就会等待该Promise对象的状态发生变化，才会被调用。
-getJSON("/post/1.json").then(function(post) {
-  return getJSON(post.commentURL);
-}).then(function funcA(comments) {
-  console.log("resolved: ", comments);
-}, function funcB(err){
-  console.log("rejected: ", err);
-});
-上面代码中，第一个then方法指定的回调函数，返回的是另一个Promise对象。这时，第二个then方法指定的回调函数，就会等待这个新的Promise对象状态发生变化。如果变为resolved，就调用funcA，如果状态变为rejected，就调用funcB。
-这个有点类似前面提到的‘由p1的状态决定p2的状态。’
 
 
 
@@ -230,6 +229,7 @@ getJSON("/post/1.json").then(function(post) {
 
 
 接下来看
+------------------------------------------await概述-------------------------------------------
 既然有了promise 为什么还要有async await ？当然是promise也不是完美的异步解决方案，而async await 的写法看起来更加简单且容易理解。
 async/await相比原来的Promise的优势在于处理then链。
 回顾Promise：Promise对象用于表示一个异步操作的最终状态（完成或失败），以及其返回的值。
@@ -237,8 +237,10 @@ async/await相比原来的Promise的优势在于处理then链。
 async await字面理解：async用于申明一个function 是异步的，而await用于等待一个异步任务执行完成的的结果。并且await 只能出现在async函数中。
 async告诉程序这是一个异步操作。
 await是一个操作符，即await后面是一个异步表达式/promise，程序的执行流会暂停，且一直在等待这个异步表达式/promise的结果。
+------------------------------------------await概述-------------------------------------------
 
 
+-----------------------------------------async函数-------------------------------------
 async函数的返回值
 当调用一个async函数时，会返回一个Promise对象。
 当这个async函数返回的是一个值时，Promise的resolve方法会负责传递这个值；
@@ -252,14 +254,13 @@ let data = testAsync().then( (data) => {
   return data
 });
 console.log(data);
-而如果async函数没有返回值,那么调用async函数相当于Promise.resolve(undefined)
+而如果async函数没有return返回值,那么调用async函数相当于Promise.resolve(undefined)
+-----------------------------------------async函数-------------------------------------
 
 
+-----------------------------------------await表达式的值---------------------------------
 假如await后面的表达式返回的是一个Promise对象，那么这个promise的resolve函数参数将作为await表达式的值。如果这个Promise rejected了，await表达式也能够捕获到这个promise的异常并把这个Promise的异常抛出。
 假如await后面的表达式返回的是一个常量，那么会把这个常量转为Promise.resolve(常量)，同理如果没有返回值也是underfind。
-
-
-
 
 demo
 返回promose 对象，成功状态
@@ -295,6 +296,8 @@ async function demo() {
     }
 }
 demo();
+-----------------------------------------await表达式的值---------------------------------
+------------------穿插工作实践-----------------
 
 
 
@@ -302,10 +305,10 @@ demo();
 
 既然说到了async，那么接下来再来看
 nodejs常用模块async(waterfall,each,eachSeries,whilst)
+----------------------------------------引入背景-------------------------------------------
 先看一段代码
 var objs = [{name:'A'}, {name:'B'}, {name:'C'}];
-function doSomething(obj, cb)
-{
+function doSomething(obj, cb){
     console.log("我在做" + obj.name + "这件事!");
     cb(null, obj);
 }
@@ -345,7 +348,7 @@ doSomething(objs[0], function(err, data){
 如果A成功，再做B这件事
 如果B成功，再做C这件事
 */
-
+----------------------------------------引入背景-------------------------------------------
 
 
 
@@ -357,7 +360,7 @@ function doSomething(obj, cb){
 }
 
 
-
+----------------------------------------async瀑布模型-------------------------------------------
 /*
 //看看async模块的瀑布模型:
 async.waterfall([
@@ -412,8 +415,8 @@ async.waterfall([
 { name: 'B' }
 { name: 'C' }
 */
-
-
+----------------------------------------async瀑布模型-------------------------------------------
+------------------穿插工作实践-----------------
 
 
 /*
@@ -537,3 +540,4 @@ co(function *() {
     var products = yield $.get('/api/products');
     console.log(products);
 });
+------------------穿插工作实践-----------------
