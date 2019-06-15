@@ -33,11 +33,11 @@ GPIO.setwarnings(False)
 
 #记录的上一次舵机所在的角度
 last_btm_degree = 90
-last_top_degree = 0
+last_top_degree = 45
 
 #控制舵机旋转的比例系数
-btm_kp = 5
-top_kp = 5 
+btm_kp = 15
+top_kp = 15 
 
 #设定偏移量死区范围
 #解决目标在画面中心附近舵机来回摆动的问题，如果偏移量小于一定的数值舵机就不动。
@@ -136,14 +136,16 @@ def calculate_offset(frame_width, frame_height, face):
 
 def genzhong():
     #for Mac
-    FaceCascade = cv2.CascadeClassifier("/usr/local/Cellar/opencv/3.4.3_2/share/OpenCV/haarcascades/haarcascade_frontalface_alt.xml")
+    #FaceCascade = cv2.CascadeClassifier("/usr/local/Cellar/opencv/3.4.3_2/share/OpenCV/haarcascades/haarcascade_frontalface_alt.xml")
     #for raspberryPi
-    #FaceCascade = cv2.CascadeClassifier('/usr/local/share/OpenCV/haarcascades/haarcascade_frontalface_alt.xml')
-    cv2.namedWindow('FaceDetect',flags=cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO | cv2.WINDOW_GUI_EXPANDED)
+    FaceCascade = cv2.CascadeClassifier('/usr/local/share/OpenCV/haarcascades/haarcascade_frontalface_alt.xml')
+    cv2.namedWindow('FaceDetect')
 
-    cap = cv2.VideoCapture(0)
-    # 设置缓存区的大小
-    cap.set(cv2.CAP_PROP_BUFFERSIZE,1)
+    #cap = cv2.VideoCapture(0)
+    #使用树莓派ip摄像头
+    ip_camera_url = 'http://192.168.43.126:8080/?action=stream'
+    cap = cv2.VideoCapture(ip_camera_url)
+    #cap.set(cv2.CAP_PROP_BUFFERSIZE,1)
 
     while cap.isOpened():
         ret, frame = cap.read()
