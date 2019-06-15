@@ -46,6 +46,8 @@ offset_dead_block = 0.1
 def car_init():
     global pwm_servoA
     global pwm_servoB
+    GPIO.setup(ServoPinA, GPIO.OUT)
+    GPIO.setup(ServoPinB, GPIO.OUT)
     pwm_servoA = GPIO.PWM(ServoPinA, 50)
     pwm_servoB = GPIO.PWM(ServoPinB, 50)
     pwm_servoA.start(0)
