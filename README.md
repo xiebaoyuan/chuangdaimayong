@@ -141,23 +141,28 @@ def genzhong():
     FaceCascade = cv2.CascadeClassifier('/usr/local/share/OpenCV/haarcascades/haarcascade_frontalface_alt.xml')
     cv2.namedWindow('FaceDetect')
 
-    #cap = cv2.VideoCapture(0)
-    #使用树莓派ip摄像头
-    ip_camera_url = 'http://192.168.43.126:8080/?action=stream'
-    cap = cv2.VideoCapture(ip_camera_url)
-    #cap.set(cv2.CAP_PROP_BUFFERSIZE,1)
+    cap = cv2.VideoCapture(0)
+    #使用另一台树莓派的ip摄像头
+    #ip_camera_url = 'http://192.168.43.126:8080/?action=stream'
+    #cap = cv2.VideoCapture(ip_camera_url)
+    cap.set(cv2.CAP_PROP_FOURCC,cv2.VideoWriter.fourcc('M','J','P','G') ) #设置摄像头读取视频编码格式
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE,1)
 
     while cap.isOpened():
         ret, frame = cap.read()
         frame = cv2.flip(frame, 1)
+        if not ret:
+            break
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = FaceCascade.detectMultiScale(gray,scaleFactor=1.1,minNeighbors=5)
+        faces = FaceCascade.detectMultiScale(grey, scaleFactor = 1.2, minNeighbors = 3, minSize = (32, 32))
     
-        if len(faces) == 0:
+        if len(faces) <= 0:
             face = None
         else :
-            # 目前找的是画面中面积最大的人脸
-            face =  max(faces, key=lambda face: face[2]*face[3])
+            #face =  max(faces, key=lambda face: face[2]*face[3]) #画面中面积最大的人脸
+            face = faces[0]
             (x, y, w, h) = face
         if face is not None:
             cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 4)
