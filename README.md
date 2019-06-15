@@ -47,6 +47,8 @@ def car_init():
     pwm_servoB = GPIO.PWM(ServoPinB, 50)
     pwm_servoA.start(0)
     pwm_servoB.start(0)
+    # 舵机角度初始化
+    xuanzhuang(last_btm_degree, last_top_degree)
 
 #舵机转动
 def xuanzhuang(bottom_degree, top_degree):
@@ -59,8 +61,7 @@ def xuanzhuang(bottom_degree, top_degree):
     time.sleep(1)
     pwm_servoB.ChangeDutyCycle(0)
 
-# 舵机角度初始化
-xuanzhuang(last_btm_degree, last_top_degree)
+
 
 
 
