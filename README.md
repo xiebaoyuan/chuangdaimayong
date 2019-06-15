@@ -28,6 +28,9 @@ import RPi.GPIO as GPIO
 ServoPinA = 12
 ServoPinB = 6
 
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+
 #记录的上一次舵机所在的角度
 last_btm_degree = 90
 last_top_degree = 0
