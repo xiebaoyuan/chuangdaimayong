@@ -100,7 +100,7 @@ def genzhong(data):
     turn_left = data[2]
     move_run = data[3]
     servoMotion = True
-    if servoa_degree == 10000 or servob_degree == 10000:
+    if servoa_degree == 66 and servob_degree == 66:#约定舵机不动的暗号
         servoMotion = False
     if servoMotion:
         if servoa_degree < 0:
@@ -127,11 +127,17 @@ def genzhong(data):
     #转向
     if turn_right :
         carmotion_right()
-        time.sleep(.5)
+        if turn_right == 2:#转弯幅度更大一些
+            time.sleep(1.5)
+        else:
+            time.sleep(.5)
         carmotion_stop()
     elif turn_left :
         carmotion_left()
-        time.sleep(.5)
+        if turn_left == 2:
+            time.sleep(1.5)
+        else:
+            time.sleep(.5)
         carmotion_stop()
 
     #前进
