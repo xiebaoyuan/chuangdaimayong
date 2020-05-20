@@ -522,6 +522,38 @@ func (rm *RedisMgr) Exists(key string) (int64, error) {
 	return 0, err
 }
 
+func (rm *RedisMgr) Expire(key string, seconds int) (bool, error) {
+	reply := make(chan *RedisResultS)
+	rm.redisCmdChan <- &RedisCommandData{
+		cmd:       REDIS_EXPIRE,
+		key:       key,
+		value:     time.Duration(seconds) * time.Second,
+		replyChan: reply,
+	}
+
+	ret, err := rm.waitResult(reply, key)
+	if err == nil {
+		return ret.(bool), err
+	}
+	return false, err
+}
+
+func (rm *RedisMgr) Keys(key string) (interface{}, error) {
+	reply := make(chan *RedisResultS)
+	rm.redisCmdChan <- &RedisCommandData{
+		cmd:       REDIS_KEYS,
+		key:       key,
+		value:     time.Duration(seconds) * time.Second,
+		replyChan: reply,
+	}
+
+	ret, err := rm.waitResult(reply, key)
+	if err == nil {
+		return ret.(bool), err
+	}
+	return false, err
+}
+
 func (rm *RedisMgr) waitResult(reply <-chan *RedisResultS, tag string) (interface{}, error) {
 	select {
 	case redisRes, ok := <-reply:
