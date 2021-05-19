@@ -1,111 +1,231 @@
-class Connection():
-#每个连接对象都要记录该连接的权重。
-#主要职责是记录连接的权重，以及这个连接所关联的上下游节点。
-    def __init__(self, conn_up_node, conn_down_node):
-        '''
-        初始化一条连接（即章鱼的触脚)
-        conn_up_node: 连接的上游节点(某只章鱼头部)，如<Node object at 0x111c>，即Node类的一个实例。
-        conn_down_node: 连接的下游节点(这只章鱼的某条触脚触及的节点)，如<Node object at 0x111c>
-        '''
-        self.conn_up_node = conn_up_node
-        self.conn_down_node = conn_down_node
-        self.weight = random.uniform(-0.1, 0.1)
-        self.gradient = 0.0
-    def calc_gradient(self):
-        #计算梯度，《机器学习》P103页【3】式
-        self.gradient = self.conn_down_node.delta * self.conn_up_node.output
-    def get_gradient(self):
-        #获取当前连接的梯度
-        return self.gradient
-    def update_weight(self, rate):
-        #根据梯度下降法更新此连接的权重
-        self.calc_gradient()
-        self.weight += rate * self.gradient
+# -*- coding:utf-8 -*-
+import cv2
+import time
+import socket
+import json
+import array
+import math
+import numpy as np
+from zhixiannihe import *
 
 
+frame_height = 0
+frame_width = 0
+qianjingcishu = 0
+guaijiaohengxianjuli = 10
 
-class Network():
-#提供API接口。它由若干层对象组成以及连接对象组成
-    def __init__(self, layers):
-        #初始化一个全连接神经网络
-        #layers: 描述神经网络每层节点数，如[7, 3, 10]
-        self.connections = []
-        self.layers = []
-        layer_count = len(layers)
-        node_count = 0
-        for i in range(layer_count):
-            self.layers.append(Layer(i, layers[i]))
-        #print(self.layers)
-        #[<Layer object at 0x10f8>, <Layer object at 0x11a8>, <Layer object at 0x11p0>]
-        #self.layers[0]是输入层，self.layers[1]是隐藏层，self.layers[2]是输出层。
-        #print('输出层节点：',self.layers[2].nodes)
-        # [<Node object at 0x111c>, <Node object at 0x111c>, <Node object at 0x111u>, … 共11个]
-        for layer in range(layer_count - 1):
-            connections = [Connection(conn_up_node, conn_down_node) 
-                for conn_up_node in self.layers[layer].nodes
-                for conn_down_node in self.layers[layer + 1].nodes[:-1]
-            ]
-            '''
-            以上两个for不是平级，而是上下级嵌套关系。
-            想象一下，神经网络每一层都是有很多章鱼组成，每一层章鱼的头部摆在左，触脚摆在右。
-            上游节点指的是某只章鱼的头部，下游节点指的是这只章鱼的各条触脚触及的节点；
-            每一条触脚就是一个Connection类（只有层与层之间存在触脚）。
-            为什么下游节点要剔除掉最后一个节点？因为每一层的最后一个节点默认指定是
-            偏置项节点(输出恒为1的参数节点)，这种节点就不要分配触脚与之连接了，浪费资源。
-            '''
-            #print('当layer为1时，即隐藏层到输出层所有连接：',connections)
-            #[<Connection object at 0x10b9>, <Connection object at 0x10b9>,…共40个]
-            for conn in connections:
-                self.connections.append(conn)
+def adjustDirection():
+    global frame_height
+    global frame_width
+    global guaijiaohengxianjuli
+    cv2.namedWindow('theRoad')
 
-            #对于某条连接conn，既要赠付给他所连的下游节点，同时也要赠付给他所连的上游节点。
-                conn.conn_down_node.append_upstream_connection(conn)
-                conn.conn_up_node.append_downstream_connection(conn)
-    def train(self, labels, data_set, rate, iteration):
-        #训练神经网络
-        #labels: 数组，训练样本标签。每个元素是一个样本的标签。
-        #data_set: 二维数组，训练样本特征。每个元素是一个样本。
-        for i in range(iteration):
-            for d in range(len(data_set)): #len(data_set)是样本个数：6个
-                #针对某个样本
-                self.predict(data_set[d])
-                self.calc_delta(labels[d])
-                self.update_weight(rate)
-    def calc_delta(self, label):
-        #计算每个节点的delta
-        output_nodes = self.layers[-1].nodes #输出层的所有节点
-        for i in range(len(label)):
-            output_nodes[i].calc_shuchuceng_jiedian_delta(label[i])
-        for layer in self.layers[-2::-1]: #反向计算
-            #先对隐藏层，后对输入层，进行以下计算
-            for node in layer.nodes:
-                node.calc_feishuchuceng_jiedian_delta()
-    def update_weight(self, rate):
-        #更新所有下游连接权重，输出层没有下游连接，所以不考虑输出层
-        for layer in self.layers[:-1]:
-            for node in layer.nodes:
-                for conn in node.downstream:
-                    conn.update_weight(rate)
+    #cap = cv2.VideoCapture(0)
+    #使用树莓派的ip摄像头
+    ip_camera_url = 'http://192.168.43.126:8080/?action=stream'
+    cap = cv2.VideoCapture(ip_camera_url)
+    cap.set(cv2.CAP_PROP_FOURCC,cv2.VideoWriter.fourcc('M','J','P','G') ) #设置摄像头读取视频编码格式
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE,1)
+
+    last_cal_time = 0
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        #frame = cv2.flip(frame, 1)
+        frame_height = frame.shape[0]
+        frame_width = frame.shape[1]
+        if not ret:
+            break
+        face = None
+        now = int(time.time())
+        if (now-last_cal_time) > 2: #限定前后两次运算间隔2秒
+            #开始检测
+            pedestrian_obj = Pedestrian()
+            backpro_img = pedestrian_obj.update(frame)
+            ld = linedetector()
+            #根据拐角横线距离来选择用哪种方式控制小车
+            print('====>>>>>>>>>>>>>>>>>>拐角横线距离<<<<<<<<<<<<<<<<<<<<<<====',guaijiaohengxianjuli)
+            if guaijiaohengxianjuli>0 and guaijiaohengxianjuli<180:
+                bazi_kongzhi(ld,backpro_img,frame)
+            elif guaijiaohengxianjuli>=180 and guaijiaohengxianjuli<200:
+                print('事故频发地段，禁止左右转弯，直冲关卡')
+                carclient.sendCommand(10000)
+
+                #更新拐角横线距离
+                ld.find_guaijiao_hengxian(backpro_img)
+                if ld.guaijiao_hengxian:
+                    guaijiaohengxianjuli = ld.guaijiao_hengxian['dist_to_top']
+            elif guaijiaohengxianjuli > 200:
+                print('把此前进行机器学习的结果拿来决策')
+                carclient.sendCommand(40,True) #假装学习结果是左转
+                guaijiaohengxianjuli = 10 #初始化拐角横线距离
+                #还要初始化机器学习结果值
+
+            last_cal_time = int(time.time())
+            
+        cv2.imshow('theRoad', frame)
     
-    def predict(self, sample):
-        #根据输入的样本预测输出值
-        #sample: 数组，某个样本的特征向量，也就是网络的输入向量
-        self.layers[0].set_shuruceng_output(sample) #输入层里的各个节点输出
-        for i in range(1, len(self.layers)):
-            self.layers[i].calc_output() #非输入层里的各个节点输出
-        
-        #返回输出层(self.layers[-1])里各个节点的输出值组成的列表/向量。
-        return list(map(lambda node: node.output, self.layers[-1].nodes[:-1]))
-    
-    #以下两个方法是附加的，用于梯度比较，没什么意义可删除，非组成神经网络的必要方法
-    def calc_gradient(self):
-        #计算每个连接的梯度
-        for layer in self.layers[:-1]:
-            for node in layer.nodes:
-                for conn in node.downstream:
-                    conn.calc_gradient()
-    def get_gradient(self, sample,label):
-        #获得网络在一个样本下，每个连接上的梯度
-        self.predict(sample)
-        self.calc_delta(label)
-        self.calc_gradient()
+        key = cv2.waitKey(1)
+        if key == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+'''
+不应让小车自己左右摇摆慢慢贴近拐角，首先拐角处道路复杂，有很多直线干扰，影响判断。其次，在拐角处
+小车贴近左侧道路边缘跟贴近右侧道路边缘所处的情形相差甚远。最后最关键的，小车在太靠近拐角的地方
+看不到拐角，只能看到一条横线，机器学习也无法决策。
+解决方案：当小车在有八字道路情形中可以直线前进时，检测此时拐角的横线离小车的距离，并把此时的画面
+交给机器学习，当这个距离到达一个阈值后，此后不应再使用机器视觉检测八字道路来决策小车行走方向，
+而应该让小车直冲关卡(一直直线前进)，这时候不再看左右两侧道路而只看前方拐角的横线，当拐角的横线
+离小车的距离再次到达另一个阈值时，用之前机器学习决策的结果来决定小车转向。
+'''
+def qianjing_xuexi(ld,backpro_img):
+    global guaijiaohengxianjuli
+    ld.find_guaijiao_hengxian(backpro_img)
+    if ld.guaijiao_hengxian:
+        guaijiaohengxianjuli = ld.guaijiao_hengxian['dist_to_top']
+    print('把图片给机器学习')
+    cv2.imshow('xuexitupian',backpro_img)
+
+
+#当有检测到完整八字形道路时，根据八字的竖直中线位置调整小车位置使得小车位于道路中央，或者也可以根据中线的角度来控制小车左转/右转。
+#当只检测到八字一撇/一捺时，根据一撇/一捺的角度来控制小车左转/右转。
+def bazi_kongzhi(ld,backpro_img,frame):
+    global qianjingcishu
+    global guaijiaohengxianjuli
+    xingtai_image = ld.xingtaichaozuo(backpro_img)
+    ld.find_bazi_lines(xingtai_image)
+    #print('八字道路：',ld.baZiLines)
+    if ld.baZiLines.get('pie') and ld.baZiLines.get('na'):
+        line_pie = ld.baZiLines.get('pie')
+        line_na = ld.baZiLines.get('na')
+        jiaodian = calJiaoDian(line_pie,line_na)
+        zhongdian_x = calMidX(line_pie,line_na,frame_height)
+        #jiaodian和zhongdian_x确定了八字道路的竖直中线
+        chazhi_x = zhongdian_x[0]-jiaodian[0]
+        print('中点横坐标减交点横坐标：',chazhi_x)
+        cv2.line(frame, tuple(jiaodian), tuple(zhongdian_x), (255,0,255), 5)
+        if chazhi_x > 60:
+            carclient.sendCommand(-40)
+        elif chazhi_x < -50:
+            carclient.sendCommand(40)
+        else:
+            carclient.sendCommand(10000) #前进
+            qianjing_xuexi(ld,backpro_img)
+        qianjingcishu = 0
+    elif ld.baZiLines.get('pie') or ld.baZiLines.get('na'):
+        jiaodu = 10000
+        if ld.baZiLines.get('pie'):
+            jiaodu = ld.baZiLines.get('pie').get('jiaodu')
+            #以下为考虑特殊干扰情况，比如明明道路在图片靠右侧，却下达指令让小车右转
+            jiaodian_x = cal_jiaodian_X(ld.baZiLines.get('pie'),frame_height)
+            if jiaodian_x > frame_width/2 :
+                jiaodu = 40 #人为干预使之左转
+        elif ld.baZiLines.get('na'):
+            jiaodu = ld.baZiLines.get('na').get('jiaodu')
+            jiaodian_x = cal_jiaodian_X(ld.baZiLines.get('na'),frame_height)
+            if jiaodian_x < frame_width/2 :
+                jiaodu = -40 #人为干预使之右转
+        print('只得到一撇或一捺:',ld.baZiLines)
+        if jiaodu > -20 and jiaodu < 20:
+            print('这应该属不正常情况了，因为八字控制的时候不应该检测到拐角横线来控制啊')
+            #即这种特殊情况：假如小车一直左摆右摆步履蹒跚地走到拐角前，也就是横线距离一直
+            #得不到更新，也就是说略过了直冲关卡的阶段。那么此时应该还要去检测近乎水平的线段
+            #更新拐角横线离相框上边的距离。
+        else:
+            carclient.sendCommand(jiaodu)
+        ld.find_guaijiao_hengxian(backpro_img)
+        if ld.guaijiao_hengxian:
+            guaijiaohengxianjuli = ld.guaijiao_hengxian['dist_to_top']
+        qianjingcishu = 0
+    elif not ld.baZiLines.get('pie') and not ld.baZiLines.get('na'):
+        #先尝试向前走两步，如果走两步之后还是None，那就停止
+        if qianjingcishu < 2:
+            #前进
+            carclient.sendCommand(10000)
+            qianjingcishu += 1
+            ld.find_guaijiao_hengxian(backpro_img)
+            if ld.guaijiao_hengxian:
+                guaijiaohengxianjuli = ld.guaijiao_hengxian['dist_to_top']
+
+
+def calJiaoDian(line1,line2):
+    #求两条直线的交点坐标
+    k1 = line1['k']
+    b1 = line1['b']
+    k2 = line2['k']
+    b2 = line2['b']
+    x=(b2-b1)/(k1-k2)
+    y = k1*x + b1
+    return [int(x),int(y)]
+
+def calMidX(line1,line2,height):
+    #求两条直线与图片底边的两个交点之间的中点
+    b1 = line1['b']
+    k1 = line1['k']
+    b2 = line2['b']
+    k2 = line2['k']
+    x1 = (height-b1)/k1
+    x2 = (height-b2)/k2
+    return [int((x1+x2)/2),int(height)]
+
+def cal_jiaodian_X(line,height):
+    #求直线与相框底边的交点横坐标x
+    b = line['b']
+    k = line['k']
+    x = (height-b)/k
+    return int(x)
+
+def test(img):
+    global frame_height
+    global frame_width
+    frame_height = img.shape[0]
+    frame_width = img.shape[1]
+    pedestrian_obj = Pedestrian()
+    backpro_img = pedestrian_obj.update(img)
+    ld = linedetector()
+    bazi_kongzhi(ld,backpro_img,img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+class sockClient(object):
+    def __init__(self):
+        self.client = socket.socket()
+    def connect(self,ip,port):
+        self.client.connect((ip,port))
+    def sendCommand(self,zhixianjiaodu,dafudu=False):
+        msg_arr = [62,0,0,0]
+        value = 1
+        if dafudu: #大幅度转弯
+            value = 2
+        if zhixianjiaodu > -60 and zhixianjiaodu < -20:
+            msg_arr[1] = value 
+            print('----------***右转***----------')
+        elif zhixianjiaodu > 20 and zhixianjiaodu < 70:
+            msg_arr[2] = value 
+            print('----------***左转***----------')
+        else:
+            msg_arr[3] = 1
+            print('----------***前进***----------')
+        msg_arr.append(66) #水平舵机旋转角度
+        msg_arr.append(66) #垂直舵机旋转角度
+        #当两者都是66时，是约定舵机不动的暗号，不能用太大的数，会超出字节数
+        self.client.send(json.dumps(msg_arr).encode('utf-8'))
+
+
+if __name__ == "__main__":
+    try:
+        carclient = sockClient()
+        carclient.connect('123.207.18.153',6969)
+        #adjustDirection()
+        test_image = cv2.imread('img/test_img18.jpg')
+        test(test_image)
+    except KeyboardInterrupt:
+        pass
+    print('即将退出')
